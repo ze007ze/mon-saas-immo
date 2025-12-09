@@ -1,0 +1,111 @@
+import streamlit as st
+import pandas as pd
+import sqlite3
+import joblib
+
+# --- FONCTIONS DE GESTION BDD (Le Backend) ---
+def init_db():
+    """Crée la table si elle n'existe pas encore"""
+    conn = sqlite3.connect("ma_base.db")
+    c = conn.cursor()
+    # Note : On a ajouté la colonne 'telephone'
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS utilisateurs (
+            pseudo TEXT,
+            email TEXT,
+            grade TEXT,
+            telephone TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def ajouter_client_bdd(pseudo, email, grade, telephone):
+    """Ajoute une ligne dans la base de données"""
+    conn = sqlite3.connect("ma_base.db")
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO utilisateurs (pseudo, email, grade, telephone) VALUES (?, ?, ?, ?)",
+        (pseudo, email, grade, telephone)
+    )
+    conn.commit()
+    conn.close()
+
+def lire_tous_clients():
+    """Récupère toutes les infos pour les donner à Pandas"""
+    conn = sqlite3.connect("ma_base.db")
+    c = conn.cursor()
+    c.execute("SELECT * FROM utilisateurs")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+# --- CHARGEMENT DE L'IA ---
+try:
+    modele_ia = joblib.load('modele_immo.pkl')
+    ia_disponible = True
+except:
+    ia_disponible = False
+
+# --- L'INTERFACE (Frontend) ---
+
+# 1. On lance l'initialisation au tout début
+init_db()
+
+st.sidebar.title("Inscription")
+pseudo = st.sidebar.text_input("Votre Pseudo")
+email = st.sidebar.text_input("Votre Email")
+telephone = st.sidebar.text_input("Votre Numéro")
+grade = st.sidebar.selectbox("Abonnement", ["Gratuit (0€)", "Pro (19€)"])
+
+st.title("🏡 Immo-SaaS & IA")
+
+if st.sidebar.button("Créer mon compte"):
+    ajouter_client_bdd(pseudo, email, grade, telephone)
+    st.success(f"Compte créé pour {pseudo} ! (Sauvegardé en BDD)")
+
+
+# --- ZONE 1 : L'ESTIMATEUR IA (Le Produit) ---
+st.divider()
+st.header("🔮 Estimateur de Prix (IA)")
+
+if ia_disponible:
+    col1, col2 = st.columns(2)
+    with col1:
+        surface = st.number_input("Surface (m²)", min_value=10, max_value=500, value=50)
+    with col2:
+        nb_pieces = st.number_input("Nombre de pièces", min_value=1, max_value=10, value=2)
+    
+    if st.button("Estimer le prix"):
+        # On envoie les DEUX variables à l'IA : [[surface, nb_pieces]]
+        donnee_a_predire = [[surface, nb_pieces]]
+        
+        # Prédiction
+        prix_estime = modele_ia.predict(donnee_a_predire)[0]
+        
+        st.balloons()
+        st.metric(label="Prix Estimé", value=f"{prix_estime:,.0f} €")
+else:
+    st.error("Le fichier 'modele_immo.pkl' est introuvable. Lance d'abord entrainement_ia.py !")
+
+
+# --- ZONE 2 : LE DASHBOARD ADMIN (Le Business) ---
+st.divider()
+st.subheader("📊 Espace Administration (KPIs)")
+
+donnees_brutes = lire_tous_clients()
+# On ajoute la colonne Telephone au DataFrame
+df = pd.DataFrame(donnees_brutes, columns=['Pseudo', 'Email', 'Grade', 'Telephone'])
+
+if not df.empty:
+    def get_prix(g):
+        return 19 if "Pro" in g else 0
+    
+    df['Prix'] = df['Grade'].apply(get_prix)
+    
+    st.metric(label="Chiffre d'Affaires Mensuel", value=f"{df['Prix'].sum()} €")
+    st.dataframe(df)
+    st.bar_chart(df['Grade'].value_counts())
+else:
+    st.info("La base de données est vide. Ajoutez un client !")
+
