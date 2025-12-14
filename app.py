@@ -102,47 +102,51 @@ elif menu == "Connexion":
         verifier_connexion(pseudo, mdp)
 
 
+
+ 
+
+
 # --- ZONE 1 : L'ESTIMATEUR IA (Le Produit) ---
-st.divider()
-st.header("🔮 Estimateur de Prix (IA)")
+if 'est_connecte' in st.session_state and st.session_state['est_connecte'] == True :
+    st.divider()
+    st.header("🔮 Estimateur de Prix (IA)")
 
-if ia_disponible:
-    col1, col2 = st.columns(2)
-    with col1:
-        surface = st.number_input("Surface (m²)", min_value=10, max_value=500, value=50)
-    with col2:
-        nb_pieces = st.number_input("Nombre de pièces", min_value=1, max_value=10, value=2)
-    
-    if st.button("Estimer le prix"):
-        # On envoie les DEUX variables à l'IA : [[surface, nb_pieces]]
-        donnee_a_predire = [[surface, nb_pieces]]
+    if ia_disponible:
+        col1, col2 = st.columns(2)
+        with col1:
+            surface = st.number_input("Surface (m²)", min_value=10, max_value=500, value=50)
+        with col2:
+            nb_pieces = st.number_input("Nombre de pièces", min_value=1, max_value=10, value=2)
         
-        # Prédiction
-        prix_estime = modele_ia.predict(donnee_a_predire)[0]
+        if st.button("Estimer le prix"):
+            # On envoie les DEUX variables à l'IA : [[surface, nb_pieces]]
+            donnee_a_predire = [[surface, nb_pieces]]
+            
+            # Prédiction
+            prix_estime = modele_ia.predict(donnee_a_predire)[0]
+            
+            
+            st.metric(label="Prix Estimé", value=f"{prix_estime:,.0f} €")
+    else:
+        st.error("Le fichier 'modele_immo.pkl' est introuvable. Lance d'abord entrainement_ia.py !")
+
+
+    # --- ZONE 2 : LE DASHBOARD ADMIN (Le Business) ---
+    st.divider()
+    st.subheader("📊 Espace Administration (KPIs)")
+
+    donnees_brutes = lire_tous_clients()
+    # On ajoute la colonne Telephone au DataFrame
+    df = pd.DataFrame(donnees_brutes, columns=['Pseudo', 'Email', 'mdp', 'Grade', 'Telephone'])
+
+    if not df.empty:
+        def get_prix(g):
+            return 19 if "Pro" in g else 0
         
-        st.balloons()
-        st.metric(label="Prix Estimé", value=f"{prix_estime:,.0f} €")
-else:
-    st.error("Le fichier 'modele_immo.pkl' est introuvable. Lance d'abord entrainement_ia.py !")
-
-
-# --- ZONE 2 : LE DASHBOARD ADMIN (Le Business) ---
-st.divider()
-st.subheader("📊 Espace Administration (KPIs)")
-
-donnees_brutes = lire_tous_clients()
-# On ajoute la colonne Telephone au DataFrame
-df = pd.DataFrame(donnees_brutes, columns=['Pseudo', 'Email', 'mdp', 'Grade', 'Telephone'])
-
-if not df.empty:
-    def get_prix(g):
-        return 19 if "Pro" in g else 0
-    
-    df['Prix'] = df['Grade'].apply(get_prix)
-    
-    st.metric(label="Chiffre d'Affaires Mensuel", value=f"{df['Prix'].sum()} €")
-    st.dataframe(df)
-    st.bar_chart(df['Grade'].value_counts())
-else:
-    st.info("La base de données est vide. Ajoutez un client !")
-
+        df['Prix'] = df['Grade'].apply(get_prix)
+        
+        st.metric(label="Chiffre d'Affaires Mensuel", value=f"{df['Prix'].sum()} €")
+        st.dataframe(df)
+        st.bar_chart(df['Grade'].value_counts())
+    else:
+        st.info("La base de données est vide. Ajoutez un client !")
