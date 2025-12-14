@@ -2,8 +2,34 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import joblib
+import hashlib
 
+def verifier_connexion(pseudo, mot_de_passe_input):
+    conn = sqlite3.connect("ma_base.db")
+    c = conn.cursor()
+    mdp_hasher = hashlib.sha256(mot_de_passe_input.encode()).hexdigest()
+    c.execute("SELECT mot_de_passe FROM utilisateurs WHERE pseudo = ?",(pseudo,))
+    pseudo_chercher = c.fetchone()
+
+    if pseudo_chercher:
+        if pseudo_chercher[0] == mdp_hasher:
+            st.success(f"mot de passe correct")
+            st.session_state['est_connecte'] = True
+            st.session_state['pseudo_user'] = pseudo
+        else:
+            st.error("mot de passe incorrect")
+    else:
+        st.error(f"mauvais mot de passe pour {pseudo}")
+    
+    conn.commit()
+    conn.close()
+
+def hasher_mdp(mot_de_passe):
+    # On encode le texte en bits, puis on le hache avec l'algo SHA-256
+    return hashlib.sha256(mot_de_passe.encode()).hexdigest()
 # --- FONCTIONS DE GESTION BDD (Le Backend) ---
+
+
 def init_db():
     """Crée la table si elle n'existe pas encore"""
     conn = sqlite3.connect("ma_base.db")
@@ -13,6 +39,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS utilisateurs (
             pseudo TEXT,
             email TEXT,
+            mot_de_passe TEXT,
             grade TEXT,
             telephone TEXT
         )
@@ -20,13 +47,13 @@ def init_db():
     conn.commit()
     conn.close()
 
-def ajouter_client_bdd(pseudo, email, grade, telephone):
+def ajouter_client_bdd(pseudo, email, mot_de_passe, grade, telephone):
     """Ajoute une ligne dans la base de données"""
     conn = sqlite3.connect("ma_base.db")
     c = conn.cursor()
     c.execute(
-        "INSERT INTO utilisateurs (pseudo, email, grade, telephone) VALUES (?, ?, ?, ?)",
-        (pseudo, email, grade, telephone)
+        "INSERT INTO utilisateurs (pseudo, email, mot_de_passe, grade, telephone) VALUES (?, ?, ?, ?, ?)",
+        (pseudo, email, mot_de_passe, grade, telephone)
     )
     conn.commit()
     conn.close()
@@ -52,17 +79,27 @@ except:
 # 1. On lance l'initialisation au tout début
 init_db()
 
-st.sidebar.title("Inscription")
-pseudo = st.sidebar.text_input("Votre Pseudo")
-email = st.sidebar.text_input("Votre Email")
-telephone = st.sidebar.text_input("Votre Numéro")
-grade = st.sidebar.selectbox("Abonnement", ["Gratuit (0€)", "Pro (19€)"])
+menu = st.sidebar.radio("", ["Inscription", "Connexion"])
 
-st.title("🏡 Immo-SaaS & IA")
+if menu == "Inscription":
+    st.sidebar.title("Inscription")
+    pseudo = st.sidebar.text_input("Votre Pseudo")
+    email = st.sidebar.text_input("Votre Email")
+    mot_de_passe = st.sidebar.text_input("Votre mot de passe")
+    telephone = st.sidebar.text_input("Votre Numéro")
+    grade = st.sidebar.selectbox("Abonnement", ["Gratuit (0€)", "Pro (19€)"])
+    mdp = hasher_mdp(mot_de_passe)
+    st.title("🏡 Immo")
 
-if st.sidebar.button("Créer mon compte"):
-    ajouter_client_bdd(pseudo, email, grade, telephone)
-    st.success(f"Compte créé pour {pseudo} ! (Sauvegardé en BDD)")
+    if st.sidebar.button("Créer mon compte"):
+        ajouter_client_bdd(pseudo, email, mdp, grade, telephone)
+        st.success(f"Compte créé pour {pseudo} ! (Sauvegardé en BDD)")
+elif menu == "Connexion":
+    st.sidebar.title("Connexion")
+    pseudo = st.sidebar.text_input("Votre pseudo")
+    mdp = st.sidebar.text_input("votre mot de passe", type='password')
+    if st.sidebar.button("Se Connecter"):
+        verifier_connexion(pseudo, mdp)
 
 
 # --- ZONE 1 : L'ESTIMATEUR IA (Le Produit) ---
@@ -95,7 +132,7 @@ st.subheader("📊 Espace Administration (KPIs)")
 
 donnees_brutes = lire_tous_clients()
 # On ajoute la colonne Telephone au DataFrame
-df = pd.DataFrame(donnees_brutes, columns=['Pseudo', 'Email', 'Grade', 'Telephone'])
+df = pd.DataFrame(donnees_brutes, columns=['Pseudo', 'Email', 'mdp', 'Grade', 'Telephone'])
 
 if not df.empty:
     def get_prix(g):
