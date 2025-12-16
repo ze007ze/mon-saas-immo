@@ -53,8 +53,8 @@ def ajouter_client_bdd(pseudo, email, mot_de_passe, grade, telephone):
     c = conn.cursor()
     c.execute(
         "INSERT INTO utilisateurs (pseudo, email, mot_de_passe, grade, telephone) VALUES (?, ?, ?, ?, ?)",
-        (pseudo, email, mot_de_passe, grade, telephone)
-    )
+        (pseudo, email, mot_de_passe, grade, telephone) )
+    
     conn.commit()
     conn.close()
 
@@ -79,33 +79,43 @@ except:
 # 1. On lance l'initialisation au tout début
 init_db()
 
-menu = st.sidebar.radio("", ["Inscription", "Connexion"])
+if 'est_connecte' in st.session_state and st.session_state['est_connecte'] == True :
+    st.sidebar.title(f"Bienvenue {st.session_state['pseudo_user']}")
+    if st.sidebar.button("Se Deconnecter"):
+        st.session_state['est_connecte'] = False
+        st.rerun()
+        
 
-if menu == "Inscription":
-    st.sidebar.title("Inscription")
-    pseudo = st.sidebar.text_input("Votre Pseudo")
-    email = st.sidebar.text_input("Votre Email")
-    mot_de_passe = st.sidebar.text_input("Votre mot de passe")
-    telephone = st.sidebar.text_input("Votre Numéro")
-    grade = st.sidebar.selectbox("Abonnement", ["Gratuit (0€)", "Pro (19€)"])
-    mdp = hasher_mdp(mot_de_passe)
-    st.title("🏡 Immo")
+    
+    
+    
+else:  
+    menu = st.sidebar.radio("", ["Inscription", "Connexion"])
 
-    if st.sidebar.button("Créer mon compte"):
-        ajouter_client_bdd(pseudo, email, mdp, grade, telephone)
-        st.success(f"Compte créé pour {pseudo} ! (Sauvegardé en BDD)")
-elif menu == "Connexion":
-    st.sidebar.title("Connexion")
-    pseudo = st.sidebar.text_input("Votre pseudo")
-    mdp = st.sidebar.text_input("votre mot de passe", type='password')
-    if st.sidebar.button("Se Connecter"):
-        verifier_connexion(pseudo, mdp)
+    if menu == "Inscription":
+        st.sidebar.title("Inscription")
+        pseudo = st.sidebar.text_input("Votre Pseudo")
+        email = st.sidebar.text_input("Votre Email")
+        mot_de_passe = st.sidebar.text_input("Votre mot de passe")
+        telephone = st.sidebar.text_input("Votre Numéro")
+        grade = st.sidebar.selectbox("Abonnement", ["Gratuit (0€)", "Pro (19€)"])
+        mdp = hasher_mdp(mot_de_passe)
+        st.title("🏡 Immo")
+
+        if st.sidebar.button("Créer mon compte"):
+            ajouter_client_bdd(pseudo, email, mdp, grade, telephone)
+            st.success(f"Compte créé pour {pseudo} ! (Sauvegardé en BDD)")
+    elif menu == "Connexion":
+        st.sidebar.title("Connexion")
+        pseudo = st.sidebar.text_input("Votre pseudo")
+        mdp = st.sidebar.text_input("votre mot de passe", type='password')
+        if st.sidebar.button("Se Connecter"):
+            verifier_connexion(pseudo, mdp)
+            
 
 
 
  
-
-
 # --- ZONE 1 : L'ESTIMATEUR IA (Le Produit) ---
 if 'est_connecte' in st.session_state and st.session_state['est_connecte'] == True :
     st.divider()
@@ -150,3 +160,4 @@ if 'est_connecte' in st.session_state and st.session_state['est_connecte'] == Tr
         st.bar_chart(df['Grade'].value_counts())
     else:
         st.info("La base de données est vide. Ajoutez un client !")
+
