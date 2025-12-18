@@ -85,10 +85,7 @@ if 'est_connecte' in st.session_state and st.session_state['est_connecte'] == Tr
         st.session_state['est_connecte'] = False
         st.rerun()
         
-
-    
-    
-    
+   
 else:  
     menu = st.sidebar.radio("", ["Inscription", "Connexion"])
 
